@@ -1,0 +1,73 @@
+---
+- id: gcp-disc-002
+  name: Enumerate Cloud Storage Buckets
+  description: Discover accessible GCS buckets and their contents
+  tactic: discovery
+  technique:
+    attack_id: T1580
+    name: Cloud Infrastructure Discovery
+  platforms:
+    darwin:
+      sh:
+        command: |
+          if command -v gsutil >/dev/null 2>&1; then
+            echo "[+] Enumerating Cloud Storage buckets:"
+            gsutil ls 2>/dev/null || echo "[-] No GCS access or no buckets found"
+            echo "[+] Testing bucket permissions:"
+            for bucket in $(gsutil ls 2>/dev/null | head -10); do
+              echo "Bucket: $bucket"
+              gsutil ls $bucket 2>/dev/null | head -5 && echo "  [+] ListObjects: ALLOWED" || echo "  [-] ListObjects: DENIED"
+              gsutil iam get $bucket 2>/dev/null >/dev/null && echo "  [+] GetIamPolicy: ALLOWED" || echo "  [-] GetIamPolicy: DENIED"
+            done
+          elif command -v gcloud >/dev/null 2>&1; then
+            echo "[+] Using gcloud to enumerate storage:"
+            gcloud storage buckets list --limit=20 2>/dev/null || echo "[-] No GCS access"
+          else
+            echo "[-] No GCS tools available"
+          fi
+    linux:
+      sh:
+        command: |
+          if command -v gsutil >/dev/null 2>&1; then
+            echo "[+] Enumerating Cloud Storage buckets:"
+            gsutil ls 2>/dev/null || echo "[-] No GCS access or no buckets found"
+            echo "[+] Testing bucket permissions:"
+            for bucket in $(gsutil ls 2>/dev/null | head -10); do
+              echo "Bucket: $bucket"
+              gsutil ls $bucket 2>/dev/null | head -5 && echo "  [+] ListObjects: ALLOWED" || echo "  [-] ListObjects: DENIED"
+              gsutil iam get $bucket 2>/dev/null >/dev/null && echo "  [+] GetIamPolicy: ALLOWED" || echo "  [-] GetIamPolicy: DENIED"
+            done
+          elif command -v gcloud >/dev/null 2>&1; then
+            echo "[+] Using gcloud to enumerate storage:"
+            gcloud storage buckets list --limit=20 2>/dev/null || echo "[-] No GCS access"
+          else
+            echo "[-] No GCS tools available"
+          fi
+    windows:
+      psh,pwsh:
+        command: |
+          try {
+            # Try gsutil first
+            $gsutilAvailable = Get-Command gsutil -ErrorAction SilentlyContinue
+            if ($gsutilAvailable) {
+              Write-Host "[+] Enumerating Cloud Storage buckets with gsutil:"
+              $buckets = gsutil ls 2>$null
+              if ($buckets) {
+                $buckets | Select-Object -First 10 | ForEach-Object {
+                  Write-Host "Bucket: $_"
+                  gsutil ls $_ 2>$null | Select-Object -First 5 | Out-Null
+                  if ($LASTEXITCODE -eq 0) { Write-Host "  [+] ListObjects: ALLOWED" } else { Write-Host "  [-] ListObjects: DENIED" }
+                  gsutil iam get $_ 2>$null | Out-Null
+                  if ($LASTEXITCODE -eq 0) { Write-Host "  [+] GetIamPolicy: ALLOWED" } else { Write-Host "  [-] GetIamPolicy: DENIED" }
+                }
+              } else {
+                Write-Host "[-] No GCS access or no buckets found"
+              }
+            } else {
+              # Try gcloud
+              Write-Host "[+] Using gcloud to enumerate storage:"
+              gcloud storage buckets list --limit=20 --format="table(name,location,storageClass)" 2>$null
+            }
+          } catch {
+            Write-Host "[-] Error enumerating Cloud Storage: $($_.Exception.Message)"
+          }

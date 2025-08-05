@@ -1,0 +1,66 @@
+---
+- id: aws-coll-001
+  name: Download S3 Bucket Contents
+  description: Attempt to download contents from accessible S3 buckets
+  tactic: collection
+  technique:
+    attack_id: T1530
+    name: Data from Cloud Storage Object
+  platforms:
+    darwin:
+      sh:
+        command: |
+          if command -v aws >/dev/null 2>&1; then
+            echo "[+] Attempting to collect S3 bucket contents:"
+            for bucket in $(aws s3 ls 2>/dev/null | awk '{print $3}' | head -5); do
+              echo "[+] Bucket: $bucket"
+              echo "  [+] Listing objects:"
+              aws s3 ls s3://$bucket/ --recursive --max-items 10 2>/dev/null || echo "  [-] Cannot list objects"
+              echo "  [+] Testing download capability (dry-run):"
+              # Use dry-run to test without actually downloading
+              aws s3 sync s3://$bucket/ /tmp/test-download --dryrun --exclude "*" --include "*.txt" --include "*.log" --include "*.config" 2>/dev/null | head -5 || echo "  [-] Cannot download"
+              echo "  [+] Checking bucket policy:"
+              aws s3api get-bucket-policy --bucket $bucket 2>/dev/null >/dev/null && echo "  [+] Bucket policy accessible" || echo "  [-] No bucket policy access"
+            done
+          else
+            echo "[-] AWS CLI not available"
+          fi
+    linux:
+      sh:
+        command: |
+          if command -v aws >/dev/null 2>&1; then
+            echo "[+] Attempting to collect S3 bucket contents:"
+            for bucket in $(aws s3 ls 2>/dev/null | awk '{print $3}' | head -5); do
+              echo "[+] Bucket: $bucket"
+              echo "  [+] Listing objects:"
+              aws s3 ls s3://$bucket/ --recursive --max-items 10 2>/dev/null || echo "  [-] Cannot list objects"
+              echo "  [+] Testing download capability (dry-run):"
+              # Use dry-run to test without actually downloading
+              aws s3 sync s3://$bucket/ /tmp/test-download --dryrun --exclude "*" --include "*.txt" --include "*.log" --include "*.config" 2>/dev/null | head -5 || echo "  [-] Cannot download"
+              echo "  [+] Checking bucket policy:"
+              aws s3api get-bucket-policy --bucket $bucket 2>/dev/null >/dev/null && echo "  [+] Bucket policy accessible" || echo "  [-] No bucket policy access"
+            done
+          else
+            echo "[-] AWS CLI not available"
+          fi
+    windows:
+      psh,pwsh:
+        command: |
+          try {
+            Write-Host "[+] Attempting to collect S3 bucket contents:"
+            $buckets = aws s3 ls 2>$null | ConvertFrom-String -PropertyNames Date1,Date2,Size,BucketName | Select-Object -ExpandProperty BucketName -First 5
+            if ($buckets) {
+              $buckets | ForEach-Object {
+                Write-Host "[+] Bucket: $_"
+                Write-Host "  [+] Listing objects:"
+                aws s3 ls "s3://$_/" --recursive --max-items 10 2>$null
+                Write-Host "  [+] Testing download capability (dry-run):"
+                aws s3 sync "s3://$_/" "$env:TEMP\test-download" --dryrun --exclude "*" --include "*.txt" --include "*.log" 2>$null | Select-Object -First 5
+                Write-Host "  [+] Checking bucket policy:"
+                aws s3api get-bucket-policy --bucket $_ 2>$null | Out-Null
+                if ($LASTEXITCODE -eq 0) { Write-Host "  [+] Bucket policy accessible" } else { Write-Host "  [-] No bucket policy access" }
+              }
+            }
+          } catch {
+            Write-Host "[-] Error collecting S3 data"
+          }

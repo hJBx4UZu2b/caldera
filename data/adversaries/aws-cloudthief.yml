@@ -1,0 +1,26 @@
+---
+id: aws-001-cloudthief
+name: AWS CloudThief
+description: |
+  Advanced cloud adversary targeting AWS environments. Simulates credential compromise,
+  privilege escalation, data exfiltration, and persistence in AWS infrastructure.
+  Based on real-world AWS attack patterns and TTPs.
+atomic_ordering:
+  # Initial Reconnaissance
+  - aws-recon-001  # AWS CLI configuration discovery
+  - aws-recon-002  # Enumerate IAM permissions
+  - aws-recon-003  # Discover AWS regions and services
+  
+  # Credential Access
+  - aws-cred-001   # Extract AWS credentials from files
+  - aws-cred-002   # Harvest instance metadata credentials
+  
+  # Discovery & Enumeration
+  - aws-disc-001   # List S3 buckets
+  - aws-disc-002   # Enumerate EC2 instances
+  
+  # Privilege Escalation
+  - aws-priv-001   # Assume higher privileged roles
+  
+  # Collection & Exfiltration
+  - aws-coll-001   # Download S3 bucket contents

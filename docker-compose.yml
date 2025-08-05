@@ -20,4 +20,6 @@ services:
       - "2222:2222"
     volumes:
       - ./:/usr/src/app
+    environment:
+      - HOST=0.0.0.0
     command: --log DEBUG

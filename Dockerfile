@@ -6,7 +6,7 @@ WORKDIR /usr/src/app
 
 ADD . .
 # Build VueJS front-end
-RUN (cd plugins/magma; npm install && npm run build)
+RUN (cd plugins/magma; npm install && npm run build) || (echo "Frontend build failed" && ls -la plugins/magma && exit 1)
 
 # This is the runtime stage
 # It containes all dependencies required by caldera
@@ -36,10 +36,15 @@ WORKDIR /usr/src/app
 # which should be repeatable.
 ADD . .
 COPY --from=ui-build /usr/src/app/plugins/magma/dist /usr/src/app/plugins/magma/dist
+RUN ls -la /usr/src/app/plugins/magma/dist/
 
 # From https://docs.docker.com/build/building/best-practices/
 # Install caldera dependencies
-RUN apt-get update && \
+RUN echo "deb http://mirrors.ustc.edu.cn/debian bookworm main contrib non-free" > /etc/apt/sources.list && \
+echo "deb http://mirrors.ustc.edu.cn/debian bookworm-updates main contrib non-free" >> /etc/apt/sources.list && \
+echo "deb http://mirrors.ustc.edu.cn/debian-security bookworm-security main contrib non-free" >> /etc/apt/sources.list && \
+echo "Acquire::http::Proxy \"http://mirrors.ustc.edu.cn:80\";" > /etc/apt/apt.conf.d/99proxy && \
+apt-get update && \
 apt-get --no-install-recommends -y install git curl unzip python3-dev python3-pip golang-go mingw-w64 zlib1g gcc && \
 rm -rf /var/lib/apt/lists/*
 
@@ -85,6 +90,10 @@ RUN cd /usr/src/app/plugins/sandcat; ./update-agents.sh
 
 # Make sure emu can always be used in container (even if not enabled right now)
 RUN cd /usr/src/app/plugins/emu; \
+    pip3 install --break-system-packages -r requirements.txt
+
+# Install builder plugin requirements
+RUN cd /usr/src/app/plugins/builder; \
     pip3 install --break-system-packages -r requirements.txt
 
 STOPSIGNAL SIGINT

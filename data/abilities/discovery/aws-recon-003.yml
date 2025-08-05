@@ -1,0 +1,56 @@
+---
+- id: aws-recon-003
+  name: Discover AWS Regions and Services
+  description: Enumerate available AWS regions and enabled services
+  tactic: discovery
+  technique:
+    attack_id: T1580
+    name: Cloud Infrastructure Discovery
+  platforms:
+    darwin:
+      sh:
+        command: |
+          if command -v aws >/dev/null 2>&1; then
+            echo "[+] Discovering AWS regions:"
+            aws ec2 describe-regions --query 'Regions[*].[RegionName,Endpoint]' --output table 2>/dev/null || echo "[-] Cannot list regions"
+            echo "[+] Testing service availability in current region:"
+            aws s3 ls --region $(aws configure get region 2>/dev/null || echo "us-east-1") 2>/dev/null >/dev/null && echo "[+] S3: Available" || echo "[-] S3: Not accessible"
+            aws ec2 describe-instances --max-items 1 2>/dev/null >/dev/null && echo "[+] EC2: Available" || echo "[-] EC2: Not accessible"
+            aws rds describe-db-instances --max-items 1 2>/dev/null >/dev/null && echo "[+] RDS: Available" || echo "[-] RDS: Not accessible"
+            aws lambda list-functions --max-items 1 2>/dev/null >/dev/null && echo "[+] Lambda: Available" || echo "[-] Lambda: Not accessible"
+            aws iam list-users --max-items 1 2>/dev/null >/dev/null && echo "[+] IAM: Available" || echo "[-] IAM: Not accessible"
+          else
+            echo "[-] AWS CLI not available"
+          fi
+    linux:
+      sh:
+        command: |
+          if command -v aws >/dev/null 2>&1; then
+            echo "[+] Discovering AWS regions:"
+            aws ec2 describe-regions --query 'Regions[*].[RegionName,Endpoint]' --output table 2>/dev/null || echo "[-] Cannot list regions"
+            echo "[+] Testing service availability in current region:"
+            aws s3 ls --region $(aws configure get region 2>/dev/null || echo "us-east-1") 2>/dev/null >/dev/null && echo "[+] S3: Available" || echo "[-] S3: Not accessible"
+            aws ec2 describe-instances --max-items 1 2>/dev/null >/dev/null && echo "[+] EC2: Available" || echo "[-] EC2: Not accessible"
+            aws rds describe-db-instances --max-items 1 2>/dev/null >/dev/null && echo "[+] RDS: Available" || echo "[-] RDS: Not accessible"
+            aws lambda list-functions --max-items 1 2>/dev/null >/dev/null && echo "[+] Lambda: Available" || echo "[-] Lambda: Not accessible"
+            aws iam list-users --max-items 1 2>/dev/null >/dev/null && echo "[+] IAM: Available" || echo "[-] IAM: Not accessible"
+          else
+            echo "[-] AWS CLI not available"
+          fi
+    windows:
+      psh,pwsh:
+        command: |
+          try {
+            Write-Host "[+] Discovering AWS regions:"
+            $regions = aws ec2 describe-regions --query 'Regions[*].RegionName' --output text 2>$null
+            if ($regions) { 
+              $regions -split "`t" | Select-Object -First 10 | ForEach-Object { Write-Host "Region: $_" }
+            }
+            Write-Host "[+] Testing service availability:"
+            aws s3 ls 2>$null | Out-Null; if ($LASTEXITCODE -eq 0) { Write-Host "[+] S3: Available" } else { Write-Host "[-] S3: Not accessible" }
+            aws ec2 describe-instances --max-items 1 2>$null | Out-Null; if ($LASTEXITCODE -eq 0) { Write-Host "[+] EC2: Available" } else { Write-Host "[-] EC2: Not accessible" }
+            aws rds describe-db-instances --max-items 1 2>$null | Out-Null; if ($LASTEXITCODE -eq 0) { Write-Host "[+] RDS: Available" } else { Write-Host "[-] RDS: Not accessible" }
+            aws lambda list-functions --max-items 1 2>$null | Out-Null; if ($LASTEXITCODE -eq 0) { Write-Host "[+] Lambda: Available" } else { Write-Host "[-] Lambda: Not accessible" }
+          } catch {
+            Write-Host "[-] Error discovering AWS services"
+          }

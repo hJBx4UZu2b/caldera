@@ -1,0 +1,59 @@
+---
+- id: aws-disc-001
+  name: List S3 Buckets
+  description: Enumerate accessible S3 buckets and their permissions
+  tactic: discovery
+  technique:
+    attack_id: T1580
+    name: Cloud Infrastructure Discovery
+  platforms:
+    darwin:
+      sh:
+        command: |
+          if command -v aws >/dev/null 2>&1; then
+            echo "[+] Enumerating S3 buckets:"
+            aws s3 ls 2>/dev/null || echo "[-] No S3 access or no buckets found"
+            echo "[+] Testing bucket permissions on discovered buckets:"
+            for bucket in $(aws s3 ls 2>/dev/null | awk '{print $3}' | head -10); do
+              echo "Bucket: $bucket"
+              aws s3 ls s3://$bucket/ --max-items 5 2>/dev/null && echo "  [+] ListObjects: ALLOWED" || echo "  [-] ListObjects: DENIED"
+              aws s3api get-bucket-acl --bucket $bucket 2>/dev/null >/dev/null && echo "  [+] GetBucketAcl: ALLOWED" || echo "  [-] GetBucketAcl: DENIED"
+            done
+          else
+            echo "[-] AWS CLI not available"
+          fi
+    linux:
+      sh:
+        command: |
+          if command -v aws >/dev/null 2>&1; then
+            echo "[+] Enumerating S3 buckets:"
+            aws s3 ls 2>/dev/null || echo "[-] No S3 access or no buckets found"
+            echo "[+] Testing bucket permissions on discovered buckets:"
+            for bucket in $(aws s3 ls 2>/dev/null | awk '{print $3}' | head -10); do
+              echo "Bucket: $bucket"
+              aws s3 ls s3://$bucket/ --max-items 5 2>/dev/null && echo "  [+] ListObjects: ALLOWED" || echo "  [-] ListObjects: DENIED"
+              aws s3api get-bucket-acl --bucket $bucket 2>/dev/null >/dev/null && echo "  [+] GetBucketAcl: ALLOWED" || echo "  [-] GetBucketAcl: DENIED"
+            done
+          else
+            echo "[-] AWS CLI not available"
+          fi
+    windows:
+      psh,pwsh:
+        command: |
+          try {
+            Write-Host "[+] Enumerating S3 buckets:"
+            $buckets = aws s3 ls 2>$null | ConvertFrom-String -PropertyNames Date1,Date2,Size,BucketName | Select-Object -ExpandProperty BucketName -First 10
+            if ($buckets) {
+              $buckets | ForEach-Object {
+                Write-Host "Bucket: $_"
+                aws s3 ls "s3://$_/" --max-items 5 2>$null | Out-Null
+                if ($LASTEXITCODE -eq 0) { Write-Host "  [+] ListObjects: ALLOWED" } else { Write-Host "  [-] ListObjects: DENIED" }
+                aws s3api get-bucket-acl --bucket $_ 2>$null | Out-Null
+                if ($LASTEXITCODE -eq 0) { Write-Host "  [+] GetBucketAcl: ALLOWED" } else { Write-Host "  [-] GetBucketAcl: DENIED" }
+              }
+            } else {
+              Write-Host "[-] No S3 access or no buckets found"
+            }
+          } catch {
+            Write-Host "[-] Error enumerating S3 buckets"
+          }

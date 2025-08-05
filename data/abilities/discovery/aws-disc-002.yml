@@ -1,0 +1,54 @@
+---
+- id: aws-disc-002
+  name: Enumerate EC2 Instances
+  description: Discover and enumerate EC2 instances across regions
+  tactic: discovery
+  technique:
+    attack_id: T1580
+    name: Cloud Infrastructure Discovery
+  platforms:
+    darwin:
+      sh:
+        command: |
+          if command -v aws >/dev/null 2>&1; then
+            echo "[+] Enumerating EC2 instances:"
+            aws ec2 describe-instances --query 'Reservations[*].Instances[*].[InstanceId,InstanceType,State.Name,PublicIpAddress,PrivateIpAddress,KeyName]' --output table 2>/dev/null || echo "[-] No EC2 access"
+            echo "[+] EC2 Security Groups:"
+            aws ec2 describe-security-groups --query 'SecurityGroups[*].[GroupId,GroupName,Description]' --output table --max-items 10 2>/dev/null || echo "[-] No security group access"
+            echo "[+] EC2 Key Pairs:"
+            aws ec2 describe-key-pairs --query 'KeyPairs[*].[KeyName,KeyFingerprint]' --output table 2>/dev/null || echo "[-] No key pair access"
+            echo "[+] EBS Volumes:"
+            aws ec2 describe-volumes --query 'Volumes[*].[VolumeId,Size,State,Encrypted]' --output table --max-items 10 2>/dev/null || echo "[-] No EBS access"
+          else
+            echo "[-] AWS CLI not available"
+          fi
+    linux:
+      sh:
+        command: |
+          if command -v aws >/dev/null 2>&1; then
+            echo "[+] Enumerating EC2 instances:"
+            aws ec2 describe-instances --query 'Reservations[*].Instances[*].[InstanceId,InstanceType,State.Name,PublicIpAddress,PrivateIpAddress,KeyName]' --output table 2>/dev/null || echo "[-] No EC2 access"
+            echo "[+] EC2 Security Groups:"
+            aws ec2 describe-security-groups --query 'SecurityGroups[*].[GroupId,GroupName,Description]' --output table --max-items 10 2>/dev/null || echo "[-] No security group access"
+            echo "[+] EC2 Key Pairs:"
+            aws ec2 describe-key-pairs --query 'KeyPairs[*].[KeyName,KeyFingerprint]' --output table 2>/dev/null || echo "[-] No key pair access"
+            echo "[+] EBS Volumes:"
+            aws ec2 describe-volumes --query 'Volumes[*].[VolumeId,Size,State,Encrypted]' --output table --max-items 10 2>/dev/null || echo "[-] No EBS access"
+          else
+            echo "[-] AWS CLI not available"
+          fi
+    windows:
+      psh,pwsh:
+        command: |
+          try {
+            Write-Host "[+] Enumerating EC2 instances:"
+            aws ec2 describe-instances --query 'Reservations[*].Instances[*].[InstanceId,InstanceType,State.Name,PublicIpAddress,PrivateIpAddress]' --output table 2>$null
+            Write-Host "[+] EC2 Security Groups:"
+            aws ec2 describe-security-groups --query 'SecurityGroups[*].[GroupId,GroupName,Description]' --output table --max-items 10 2>$null
+            Write-Host "[+] EC2 Key Pairs:"
+            aws ec2 describe-key-pairs --query 'KeyPairs[*].[KeyName,KeyFingerprint]' --output table 2>$null
+            Write-Host "[+] EBS Volumes:"
+            aws ec2 describe-volumes --query 'Volumes[*].[VolumeId,Size,State,Encrypted]' --output table --max-items 10 2>$null
+          } catch {
+            Write-Host "[-] Error enumerating EC2 resources"
+          }

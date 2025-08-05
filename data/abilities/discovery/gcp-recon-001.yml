@@ -1,0 +1,55 @@
+---
+- id: gcp-recon-001
+  name: Enumerate GCP Projects
+  description: Discover accessible GCP projects and configurations
+  tactic: discovery
+  technique:
+    attack_id: T1580
+    name: Cloud Infrastructure Discovery
+  platforms:
+    darwin:
+      sh:
+        command: |
+          if command -v gcloud >/dev/null 2>&1; then
+            echo "[+] Google Cloud SDK found"
+            gcloud version 2>/dev/null || echo "gcloud version unavailable"
+            echo "[+] Current configuration:"
+            gcloud config list 2>/dev/null || echo "No gcloud configuration"
+            echo "[+] Available projects:"
+            gcloud projects list --limit=20 2>/dev/null || echo "No project access or error"
+            echo "[+] Current project info:"
+            gcloud compute project-info describe 2>/dev/null || echo "No project info access"
+          else
+            echo "[-] Google Cloud SDK not found"
+          fi
+    linux:
+      sh:
+        command: |
+          if command -v gcloud >/dev/null 2>&1; then
+            echo "[+] Google Cloud SDK found"
+            gcloud version 2>/dev/null || echo "gcloud version unavailable"
+            echo "[+] Current configuration:"
+            gcloud config list 2>/dev/null || echo "No gcloud configuration"
+            echo "[+] Available projects:"
+            gcloud projects list --limit=20 2>/dev/null || echo "No project access or error"
+            echo "[+] Current project info:"
+            gcloud compute project-info describe 2>/dev/null || echo "No project info access"
+          else
+            echo "[-] Google Cloud SDK not found"
+          fi
+    windows:
+      psh,pwsh:
+        command: |
+          try {
+            $gcloudVersion = gcloud version 2>$null
+            Write-Host "[+] Google Cloud SDK found"
+            Write-Host $gcloudVersion
+            Write-Host "[+] Current configuration:"
+            gcloud config list 2>$null
+            Write-Host "[+] Available projects:"
+            gcloud projects list --limit=20 --format="table(projectId,name,projectNumber)" 2>$null
+            Write-Host "[+] Current project info:"
+            gcloud compute project-info describe --format="yaml" 2>$null
+          } catch {
+            Write-Host "[-] Google Cloud SDK not found or error occurred"
+          }

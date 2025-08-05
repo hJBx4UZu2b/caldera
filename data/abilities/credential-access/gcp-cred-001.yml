@@ -1,0 +1,79 @@
+---
+- id: gcp-cred-001
+  name: Extract Service Account Keys
+  description: Search for GCP service account key files
+  tactic: credential-access
+  technique:
+    attack_id: T1552.001
+    name: Credentials In Files
+  platforms:
+    darwin:
+      sh:
+        command: |
+          echo "[+] Searching for GCP service account keys:"
+          # Search for JSON key files
+          find /Users/$USER -name "*.json" 2>/dev/null | head -20 | while read file; do
+            if grep -l "private_key.*BEGIN.*PRIVATE.*KEY\|client_email.*gserviceaccount\|type.*service_account" "$file" 2>/dev/null; then
+              echo "[+] Potential service account key: $file"
+              jq -r '.client_email // empty' "$file" 2>/dev/null && echo "  [+] Client email found"
+              jq -r '.project_id // empty' "$file" 2>/dev/null && echo "  [+] Project ID found"
+              jq -r '.type // empty' "$file" 2>/dev/null && echo "  [+] Key type found"
+            fi
+          done
+          # Check for ADC (Application Default Credentials)
+          if [ -f ~/.config/gcloud/application_default_credentials.json ]; then
+            echo "[+] Found Application Default Credentials: ~/.config/gcloud/application_default_credentials.json"
+            jq -r '.client_id // empty' ~/.config/gcloud/application_default_credentials.json 2>/dev/null
+          fi
+          # Check environment variables
+          echo "[+] Checking environment variables:"
+          env | grep -i "GOOGLE\|GCLOUD" | sed 's/=.*$/=[REDACTED]/'
+    linux:
+      sh:
+        command: |
+          echo "[+] Searching for GCP service account keys:"
+          # Search for JSON key files
+          find /home/$USER -name "*.json" 2>/dev/null | head -20 | while read file; do
+            if grep -l "private_key.*BEGIN.*PRIVATE.*KEY\|client_email.*gserviceaccount\|type.*service_account" "$file" 2>/dev/null; then
+              echo "[+] Potential service account key: $file"
+              jq -r '.client_email // empty' "$file" 2>/dev/null && echo "  [+] Client email found"
+              jq -r '.project_id // empty' "$file" 2>/dev/null && echo "  [+] Project ID found"
+              jq -r '.type // empty' "$file" 2>/dev/null && echo "  [+] Key type found"
+            fi
+          done
+          # Check for ADC (Application Default Credentials)
+          if [ -f ~/.config/gcloud/application_default_credentials.json ]; then
+            echo "[+] Found Application Default Credentials: ~/.config/gcloud/application_default_credentials.json"
+            jq -r '.client_id // empty' ~/.config/gcloud/application_default_credentials.json 2>/dev/null
+          fi
+          # Check environment variables
+          echo "[+] Checking environment variables:"
+          env | grep -i "GOOGLE\|GCLOUD" | sed 's/=.*$/=[REDACTED]/'
+    windows:
+      psh,pwsh:
+        command: |
+          Write-Host "[+] Searching for GCP service account keys:"
+          # Search for JSON key files
+          $searchPaths = @("$env:USERPROFILE", "$env:USERPROFILE\Documents", "$env:USERPROFILE\Desktop")
+          foreach ($path in $searchPaths) {
+            Get-ChildItem -Path $path -Filter "*.json" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 10 | ForEach-Object {
+              $content = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue 2>$null
+              if ($content -and ($content -match 'service_account|gserviceaccount|private_key')) {
+                Write-Host "[+] Potential service account key: $($_.FullName)"
+                try {
+                  $json = $content | ConvertFrom-Json
+                  if ($json.client_email) { Write-Host "  [+] Client email: $($json.client_email)" }
+                  if ($json.project_id) { Write-Host "  [+] Project ID: $($json.project_id)" }
+                  if ($json.type) { Write-Host "  [+] Key type: $($json.type)" }
+                } catch {}
+              }
+            }
+          }
+          # Check for ADC
+          $adcPath = "$env:APPDATA\gcloud\application_default_credentials.json"
+          if (Test-Path $adcPath) {
+            Write-Host "[+] Found Application Default Credentials: $adcPath"
+          }
+          # Check environment variables
+          Write-Host "[+] Checking environment variables:"
+          Get-ChildItem Env: | Where-Object { $_.Name -match 'GOOGLE|GCLOUD' } | Select-Object Name, @{Name="Value";Expression={"[REDACTED]"}} | Format-Table

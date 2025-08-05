@@ -1,0 +1,54 @@
+---
+- id: gcp-disc-001
+  name: List Compute Engine Instances
+  description: Enumerate GCE instances and their configurations
+  tactic: discovery
+  technique:
+    attack_id: T1580
+    name: Cloud Infrastructure Discovery
+  platforms:
+    darwin:
+      sh:
+        command: |
+          if command -v gcloud >/dev/null 2>&1; then
+            echo "[+] Enumerating Compute Engine instances:"
+            gcloud compute instances list --limit=20 --format="table(name,zone,machineType,status,externalIP,internalIP)" 2>/dev/null || echo "[-] No GCE access"
+            echo "[+] Compute Engine firewall rules:"
+            gcloud compute firewall-rules list --limit=10 --format="table(name,direction,priority,sourceRanges.list():label=SRC_RANGES,allowed[].map().firewall_rule().list():label=ALLOW)" 2>/dev/null || echo "[-] No firewall access"
+            echo "[+] Instance templates:"
+            gcloud compute instance-templates list --limit=10 --format="table(name,machineType,createTime)" 2>/dev/null || echo "[-] No template access"
+            echo "[+] Disks:"
+            gcloud compute disks list --limit=10 --format="table(name,zone,sizeGb,type,status)" 2>/dev/null || echo "[-] No disk access"
+          else
+            echo "[-] gcloud CLI not available"
+          fi
+    linux:
+      sh:
+        command: |
+          if command -v gcloud >/dev/null 2>&1; then
+            echo "[+] Enumerating Compute Engine instances:"
+            gcloud compute instances list --limit=20 --format="table(name,zone,machineType,status,externalIP,internalIP)" 2>/dev/null || echo "[-] No GCE access"
+            echo "[+] Compute Engine firewall rules:"
+            gcloud compute firewall-rules list --limit=10 --format="table(name,direction,priority,sourceRanges.list():label=SRC_RANGES,allowed[].map().firewall_rule().list():label=ALLOW)" 2>/dev/null || echo "[-] No firewall access"
+            echo "[+] Instance templates:"
+            gcloud compute instance-templates list --limit=10 --format="table(name,machineType,createTime)" 2>/dev/null || echo "[-] No template access"
+            echo "[+] Disks:"
+            gcloud compute disks list --limit=10 --format="table(name,zone,sizeGb,type,status)" 2>/dev/null || echo "[-] No disk access"
+          else
+            echo "[-] gcloud CLI not available"
+          fi
+    windows:
+      psh,pwsh:
+        command: |
+          try {
+            Write-Host "[+] Enumerating Compute Engine instances:"
+            gcloud compute instances list --limit=20 --format="table(name,zone,machineType,status,externalIP,internalIP)" 2>$null
+            Write-Host "[+] Compute Engine firewall rules:"
+            gcloud compute firewall-rules list --limit=10 --format="table(name,direction,priority,sourceRanges.list():label=SRC_RANGES)" 2>$null
+            Write-Host "[+] Instance templates:"
+            gcloud compute instance-templates list --limit=10 --format="table(name,machineType,createTime)" 2>$null
+            Write-Host "[+] Disks:"
+            gcloud compute disks list --limit=10 --format="table(name,zone,sizeGb,type,status)" 2>$null
+          } catch {
+            Write-Host "[-] Error enumerating GCE resources"
+          }

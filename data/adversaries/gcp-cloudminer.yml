@@ -1,0 +1,21 @@
+---
+id: gcp-001-cloudminer
+name: GCP CloudMiner
+description: |
+  Advanced adversary targeting Google Cloud Platform environments. Simulates
+  service account compromise, GKE cluster exploitation, and resource hijacking
+  for cryptocurrency mining operations.
+atomic_ordering:
+  # Initial Reconnaissance
+  - gcp-recon-001  # Enumerate GCP projects
+  
+  # Credential Access
+  - gcp-cred-001   # Extract service account keys
+  - gcp-cred-002   # Harvest GCE metadata credentials
+  
+  # Discovery & Enumeration
+  - gcp-disc-001   # List Compute Engine instances
+  - gcp-disc-002   # Enumerate Cloud Storage buckets
+  
+  # Privilege Escalation
+  - gcp-priv-001   # Impersonate service accounts

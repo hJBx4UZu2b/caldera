@@ -1,0 +1,52 @@
+---
+- id: aws-recon-001
+  name: AWS CLI Configuration Discovery
+  description: Discover AWS CLI configuration and credentials
+  tactic: discovery
+  technique:
+    attack_id: T1552.001
+    name: Credentials In Files
+  platforms:
+    darwin:
+      sh:
+        command: |
+          if command -v aws >/dev/null 2>&1; then
+            echo "[+] AWS CLI found"
+            aws --version 2>/dev/null || echo "AWS CLI version unavailable"
+            echo "[+] AWS Config files:"
+            ls -la ~/.aws/ 2>/dev/null || echo "No ~/.aws directory"
+            cat ~/.aws/config 2>/dev/null | head -20 || echo "No config file"
+            echo "[+] AWS Credentials:"
+            cat ~/.aws/credentials 2>/dev/null | head -10 | sed 's/aws_secret_access_key.*/aws_secret_access_key = [REDACTED]/' || echo "No credentials file"
+          else
+            echo "[-] AWS CLI not found"
+          fi
+    linux:
+      sh:
+        command: |
+          if command -v aws >/dev/null 2>&1; then
+            echo "[+] AWS CLI found"
+            aws --version 2>/dev/null || echo "AWS CLI version unavailable"
+            echo "[+] AWS Config files:"
+            ls -la ~/.aws/ 2>/dev/null || echo "No ~/.aws directory"
+            cat ~/.aws/config 2>/dev/null | head -20 || echo "No config file"
+            echo "[+] AWS Credentials:"
+            cat ~/.aws/credentials 2>/dev/null | head -10 | sed 's/aws_secret_access_key.*/aws_secret_access_key = [REDACTED]/' || echo "No credentials file"
+          else
+            echo "[-] AWS CLI not found"
+          fi
+    windows:
+      psh,pwsh:
+        command: |
+          try {
+            $awsVersion = aws --version 2>$null
+            Write-Host "[+] AWS CLI found: $awsVersion"
+            Write-Host "[+] AWS Config files:"
+            Get-ChildItem "$env:USERPROFILE\.aws" -ErrorAction SilentlyContinue | Format-Table Name, Length, LastWriteTime
+            Write-Host "[+] AWS Config content:"
+            Get-Content "$env:USERPROFILE\.aws\config" -Head 20 -ErrorAction SilentlyContinue
+            Write-Host "[+] AWS Credentials (redacted):"
+            Get-Content "$env:USERPROFILE\.aws\credentials" -ErrorAction SilentlyContinue | Select-String -NotMatch "aws_secret_access_key" | Select-Object -First 10
+          } catch {
+            Write-Host "[-] AWS CLI not found or error occurred"
+          }
