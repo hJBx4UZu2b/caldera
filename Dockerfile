@@ -2,11 +2,76 @@
 # Build the UI
 FROM node:23 AS ui-build
 
+# Install git for submodule operations
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /usr/src/app
 
 ADD . .
+
+# Check for missing submodules and provide clear error message
+RUN echo "Checking for missing submodules..." && \
+    MISSING_SUBMODULES="" && \
+    for submodule in plugins/magma plugins/sandcat plugins/stockpile; do \
+        if [ ! -d "$submodule" ] || [ -z "$(ls -A $submodule 2>/dev/null)" ]; then \
+            echo "ERROR: Missing or empty submodule: $submodule"; \
+            MISSING_SUBMODULES="$MISSING_SUBMODULES $submodule"; \
+        fi; \
+    done && \
+    if [ ! -z "$MISSING_SUBMODULES" ]; then \
+        echo ""; \
+        echo "=== SUBMODULE INITIALIZATION REQUIRED ==="; \
+        echo "The following submodules are missing:$MISSING_SUBMODULES"; \
+        echo ""; \
+        echo "Please run ONE of these solutions BEFORE building Docker:"; \
+        echo ""; \
+        echo "Solution 1 (Recommended): Use the build helper script"; \
+        echo "  ./build-caldera-enhanced.sh"; \
+        echo ""; \
+        echo "Solution 2: Initialize submodules manually"; \
+        echo "  git submodule update --init --recursive"; \
+        echo "  docker-compose build"; \
+        echo ""; \
+        echo "Solution 3: Re-clone with submodules"; \
+        echo "  rm -rf <current-directory>"; \
+        echo "  git clone --recursive https://github.com/mitre/caldera.git"; \
+        echo "  cd caldera && docker-compose build"; \
+        echo ""; \
+        echo "Note: Git operations cannot be performed inside Docker due to .dockerignore"; \
+        echo "excluding .git directories for security and performance reasons."; \
+        echo ""; \
+        exit 1; \
+    else \
+        echo "✅ All critical submodules are present"; \
+    fi
+
 # Build VueJS front-end
-RUN (cd plugins/magma; npm install && npm run build) || (echo "Frontend build failed" && ls -la plugins/magma && exit 1)
+RUN if [ -f "plugins/magma/package.json" ]; then \
+        echo "Building Magma frontend..."; \
+        cd plugins/magma; \
+        echo "Installing npm dependencies..."; \
+        npm install; \
+        echo "Building Vue.js frontend..."; \
+        npm run build; \
+        echo "Frontend build completed"; \
+        if [ ! -d "dist" ]; then \
+            echo "ERROR: Frontend build failed - dist directory not created"; \
+            echo "This can happen due to:"; \
+            echo "1. Node.js/npm installation issues"; \
+            echo "2. Network connectivity problems during npm install"; \
+            echo "3. Build script failures"; \
+            echo "Contents of plugins/magma:"; \
+            ls -la .; \
+            exit 1; \
+        fi; \
+        echo "✅ Frontend build successful - dist directory created"; \
+        ls -la dist/; \
+    else \
+        echo "Error: Magma submodule still not available after initialization"; \
+        echo "Please run: git clone --recursive <repo-url> or git submodule update --init --recursive"; \
+        ls -la plugins/magma; \
+        exit 1; \
+    fi
 
 # This is the runtime stage
 # It containes all dependencies required by caldera
@@ -36,7 +101,21 @@ WORKDIR /usr/src/app
 # which should be repeatable.
 ADD . .
 COPY --from=ui-build /usr/src/app/plugins/magma/dist /usr/src/app/plugins/magma/dist
-RUN ls -la /usr/src/app/plugins/magma/dist/
+RUN echo "Verifying frontend assets copied correctly..." && \
+    if [ ! -d "/usr/src/app/plugins/magma/dist" ]; then \
+        echo "ERROR: Frontend dist directory not found after copy"; \
+        echo "Contents of plugins/magma:"; \
+        ls -la /usr/src/app/plugins/magma/ || echo "magma directory does not exist"; \
+        exit 1; \
+    fi && \
+    if [ ! -d "/usr/src/app/plugins/magma/dist/assets" ]; then \
+        echo "ERROR: Frontend assets directory not found"; \
+        echo "Contents of dist directory:"; \
+        ls -la /usr/src/app/plugins/magma/dist/ || echo "dist directory empty"; \
+        exit 1; \
+    fi && \
+    echo "✅ Frontend assets verified successfully" && \
+    ls -la /usr/src/app/plugins/magma/dist/
 
 # From https://docs.docker.com/build/building/best-practices/
 # Install caldera dependencies
@@ -49,7 +128,19 @@ apt-get --no-install-recommends -y install git curl unzip python3-dev python3-pi
 rm -rf /var/lib/apt/lists/*
 
 # Fix line ending error that can be caused by cloning the project in a Windows environment
-RUN cd /usr/src/app/plugins/sandcat; tr -d '\15\32' < ./update-agents.sh > ./update-agents.sh
+RUN if [ -f "/usr/src/app/plugins/sandcat/update-agents.sh" ]; then \
+        echo "Fixing line endings and permissions for sandcat update-agents.sh"; \
+        cd /usr/src/app/plugins/sandcat && \
+        tr -d '\15\32' < ./update-agents.sh > ./update-agents.sh.tmp && \
+        mv ./update-agents.sh.tmp ./update-agents.sh && \
+        chmod +x ./update-agents.sh; \
+    else \
+        echo "ERROR: sandcat submodule is not properly initialized - update-agents.sh not found"; \
+        echo "Available files in plugins/sandcat:"; \
+        ls -la /usr/src/app/plugins/sandcat/ || echo "Directory does not exist"; \
+        echo "This indicates the submodule initialization failed in the previous step"; \
+        exit 1; \
+    fi
 
 # Set timezone (default to UTC)
 ARG TZ="UTC"
@@ -83,10 +174,24 @@ RUN cd /usr/src/app/plugins/emu; ./download_payloads.sh
 RUN (find . -type d -name ".git") | xargs rm -rf
 
 # Install Go dependencies
-RUN cd /usr/src/app/plugins/sandcat/gocat; go mod tidy && go mod download
+RUN if [ -d "/usr/src/app/plugins/sandcat/gocat" ] && [ -f "/usr/src/app/plugins/sandcat/gocat/go.mod" ]; then \
+        echo "Installing Go dependencies for sandcat"; \
+        cd /usr/src/app/plugins/sandcat/gocat && go mod tidy && go mod download; \
+    else \
+        echo "ERROR: sandcat gocat directory or go.mod not found"; \
+        echo "Contents of plugins/sandcat:"; \
+        ls -la /usr/src/app/plugins/sandcat/ || echo "Directory does not exist"; \
+        exit 1; \
+    fi
 
 # Update sandcat agents
-RUN cd /usr/src/app/plugins/sandcat; ./update-agents.sh
+RUN if [ -f "/usr/src/app/plugins/sandcat/update-agents.sh" ]; then \
+        echo "Updating sandcat agents"; \
+        cd /usr/src/app/plugins/sandcat && ./update-agents.sh; \
+    else \
+        echo "ERROR: update-agents.sh not found in sandcat plugin"; \
+        exit 1; \
+    fi
 
 # Make sure emu can always be used in container (even if not enabled right now)
 RUN cd /usr/src/app/plugins/emu; \

@@ -6,8 +6,8 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        TZ: "UTC" # Timezone to use in container
-        VARIANT: "full"
+        TZ: "UTC+8" # Timezone to use in container
+        VARIANT: "slim"
     image: caldera:latest
     ports:
       - "8888:8888"
